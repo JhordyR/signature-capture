@@ -1,7 +1,7 @@
 import unittest
 import os
 from unittest.mock import Mock, patch
-from src.signature_capture.signature_capture import SerialConnection, SignatureProcessor, SignatureCapture
+from signature_capture import SerialConnection, SignatureProcessor, SignatureCapture
 from PIL import Image
 
 class TestSerialConnection(unittest.TestCase):
