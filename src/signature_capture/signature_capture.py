@@ -5,7 +5,7 @@ import os
 from uuid import uuid4
 
 class SerialConnection:
-    """Clase para manejar la conexión serial con el Arduino."""
+    """Clase para manejar la conexión serial con el Microcontrolador."""
     def __init__(self, port, baud_rate):
         self.port = port
         self.baud_rate = baud_rate
@@ -18,12 +18,12 @@ class SerialConnection:
             print(f"Conexión establecida en {self.port} a {self.baud_rate} baudios.")
             return True
         except serial.SerialException as e:
-            print(f"Error: No se pudo conectar a {self.port}. Verifica que el Arduino esté conectado y el puerto sea correcto.")
+            print(f"Error: No se pudo conectar a {self.port}. Verifica que el Microcontrolador esté conectado y el puerto sea correcto.")
             print(e)
             return False
 
     def send_command(self, command):
-        """Envía un comando al Arduino."""
+        """Envía un comando al Micrcontrolador."""
         if self.serial and self.serial.is_open:
             self.serial.write(command.encode())
             print("Enviando orden de captura...")
@@ -81,7 +81,7 @@ class SignatureCapture:
         self.signature_processor = SignatureProcessor(save_folder)
 
     def capture_signature(self, interactive=True):
-        """Captura una firma desde el Arduino y la procesa."""
+        """Captura una firma desde el Microcontrolador y la procesa."""
         if not self.serial_conn.connect():
             return
 
