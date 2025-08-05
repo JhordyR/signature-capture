@@ -2,10 +2,9 @@ import serial
 from PIL import Image, ImageFilter
 import datetime
 import os
-from uuid import uuid4
 
 class SerialConnection:
-    """Clase para manejar la conexión serial con el Microcontrolador."""
+    """Clase para manejar la conexión serial con el Arduino."""
     def __init__(self, port, baud_rate):
         self.port = port
         self.baud_rate = baud_rate
@@ -20,10 +19,11 @@ class SerialConnection:
         except serial.SerialException as e:
             print(f"Error: No se pudo conectar a {self.port}. Verifica que el Microcontrolador esté conectado y el puerto sea correcto.")
             print(e)
+            self.serial = None  # Asegurar que self.serial sea None en caso de fallo
             return False
 
     def send_command(self, command):
-        """Envía un comando al Micrcontrolador."""
+        """Envía un comando al Arduino."""
         if self.serial and self.serial.is_open:
             self.serial.write(command.encode())
             print("Enviando orden de captura...")
@@ -39,6 +39,7 @@ class SerialConnection:
         if self.serial and self.serial.is_open:
             self.serial.close()
             print("Puerto serial cerrado.")
+            self.serial = None
 
 class SignatureProcessor:
     """Clase para procesar y guardar la firma como imagen."""
@@ -53,6 +54,9 @@ class SignatureProcessor:
 
     def process_pixel_data(self, width, height, pixel_data, serial_number):
         """Procesa los datos de píxeles y guarda la imagen."""
+        if not pixel_data or width <= 0 or height <= 0:
+            print("Datos de píxeles inválidos.")
+            return
         img = Image.new('RGB', (width, height), "black")
         pixels = img.load()
 
@@ -81,7 +85,7 @@ class SignatureCapture:
         self.signature_processor = SignatureProcessor(save_folder)
 
     def capture_signature(self, interactive=True):
-        """Captura una firma desde el Microcontrolador y la procesa."""
+        """Captura una firma desde el Arduino y la procesa."""
         if not self.serial_conn.connect():
             return
 
@@ -122,7 +126,9 @@ class SignatureCapture:
                     print(f"Capturando firma con serial: {serial_number}")
                 elif line == "END_SAVING" and capturing:
                     capturing = False
-                    self.signature_processor.process_pixel_data(width, height, pixel_data, serial_number)
+                    if width > 0 and height > 0 and pixel_data:
+                        self.signature_processor.process_pixel_data(width, height, pixel_data, serial_number)
+                    pixel_data = []
                     break
                 elif capturing:
                     if line.startswith("DIM:"):

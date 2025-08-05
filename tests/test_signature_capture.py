@@ -1,7 +1,7 @@
 import unittest
 import os
-from unittest.mock import Mock, patch
-from signature_capture import SerialConnection, SignatureProcessor, SignatureCapture
+from unittest.mock import Mock, patch, MagicMock
+from src.signature_capture.signature_capture import SerialConnection, SignatureProcessor, SignatureCapture
 from PIL import Image
 
 class TestSerialConnection(unittest.TestCase):
@@ -12,7 +12,7 @@ class TestSerialConnection(unittest.TestCase):
     @patch("serial.Serial")
     def test_connect_success(self, mock_serial):
         """Prueba que connect() devuelve True cuando la conexión serial es exitosa."""
-        mock_serial.return_value = Mock()
+        mock_serial.return_value = Mock(is_open=True)
         result = self.serial_conn.connect()
         self.assertTrue(result)
         mock_serial.assert_called_once_with("COM8", 115200, timeout=1)
@@ -20,9 +20,10 @@ class TestSerialConnection(unittest.TestCase):
     @patch("serial.Serial")
     def test_connect_failure(self, mock_serial):
         """Prueba que connect() maneja correctamente un fallo de conexión."""
-        mock_serial.side_effect = Exception("Error de conexión")
+        mock_serial.side_effect = serial.SerialException("Error de conexión")
         result = self.serial_conn.connect()
         self.assertFalse(result)
+        self.assertIsNone(self.serial_conn.serial)  # Verifica que serial sea None
 
     def test_close_without_connection(self):
         """Prueba que close() no falla si no hay conexión."""
@@ -48,11 +49,16 @@ class TestSignatureProcessor(unittest.TestCase):
     @patch("PIL.Image.Image.save")
     def test_process_pixel_data(self, mock_save, mock_image):
         """Prueba que process_pixel_data procesa y guarda la imagen correctamente."""
-        mock_image.return_value = Mock(spec=Image.Image)
-        pixel_data = [(0, 0, 0xF800)]  # Ejemplo de datos de píxeles (color rojo)
+        # Crear un mock que simule un objeto Image con load()
+        mock_image_instance = Mock()
+        mock_load = Mock()
+        mock_image_instance.load.return_value = mock_load
+        mock_image.return_value = mock_image_instance
+
+        pixel_data = [(0, 0, 0xF800)]  # Ejemplo de píxel rojo
         self.processor.process_pixel_data(width=1, height=1, pixel_data=pixel_data, serial_number="TEST123")
+        mock_load.__setitem__.assert_called()  # Verifica que se asignó un píxel
         mock_save.assert_called_once()
-        self.assertTrue(os.path.exists(os.path.join("test_firmas", "firma_TEST123_*.png")))
 
 class TestSignatureCapture(unittest.TestCase):
     def setUp(self):
@@ -66,12 +72,11 @@ class TestSignatureCapture(unittest.TestCase):
                 os.remove(os.path.join("test_firmas", file))
             os.rmdir("test_firmas")
 
-    @patch.object(SerialConnection, "connect")
+    @patch.object(SerialConnection, "connect", return_value=True)
     @patch.object(SerialConnection, "send_command")
     @patch.object(SerialConnection, "read_line")
     def test_capture_signature_interactive(self, mock_read_line, mock_send_command, mock_connect):
         """Prueba la captura interactiva con entrada simulada."""
-        mock_connect.return_value = True
         mock_read_line.side_effect = [
             "START_SAVING:TEST123",
             "DIM:1,1",
@@ -79,18 +84,16 @@ class TestSignatureCapture(unittest.TestCase):
             "END_SAVING"
         ]
         mock_send_command.return_value = None
-        # Simular entrada de usuario (esto requiere un patch de input)
         with patch("builtins.input", side_effect=["", "salir"]):
             self.capture.capture_signature(interactive=True)
         mock_connect.assert_called_once()
         mock_send_command.assert_called()
 
-    @patch.object(SerialConnection, "connect")
+    @patch.object(SerialConnection, "connect", return_value=True)
     @patch.object(SerialConnection, "send_command")
     @patch.object(SerialConnection, "read_line")
     def test_capture_signature_non_interactive(self, mock_read_line, mock_send_command, mock_connect):
         """Prueba la captura no interactiva."""
-        mock_connect.return_value = True
         mock_read_line.side_effect = [
             "START_SAVING:TEST123",
             "DIM:1,1",
